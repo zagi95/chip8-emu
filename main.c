@@ -165,8 +165,8 @@ void execute_cycle(uint8_t *memory, struct chip8_regset *cpu, uint16_t *stack, u
         }
         break;
     case OP_RET:
-        cpu->pc = stack[cpu->sp];
         cpu->sp -= 1;
+        cpu->pc = stack[cpu->sp];
         break;
     case OP_SYS:
         fprintf(stderr, "OP_SYS ignored on modern interpreters!\n");
@@ -213,29 +213,27 @@ void execute_cycle(uint8_t *memory, struct chip8_regset *cpu, uint16_t *stack, u
         cpu->v[op_info.x] = cpu->v[op_info.x] ^ cpu->v[op_info.y];
         break;
     case OP_ADD_REG:
-        cpu->v[op_info.x] = cpu->v[op_info.x] + cpu->v[op_info.y];
-        cpu->v[0xf] = 1;
+        ;
+        uint16_t sum = cpu->v[op_info.x] + cpu->v[op_info.y];
+        cpu->v[0xF] = sum > 255 ? 1 : 0;
+        cpu->v[op_info.x] = sum & 0xFF;
+        
         break;
     case OP_SUB:
-        if(cpu->v[op_info.x] > cpu->v[op_info.y]) {
-            cpu->v[0xF] = 1;
-        }
-        else {
-            cpu->v[0xF] = 0;
-        }
-        cpu->v[op_info.x] = cpu->v[op_info.x] - cpu->v[op_info.y];
+        cpu->v[0xF] = cpu->v[op_info.x] >= cpu->v[op_info.y] ? 1 : 0;
+        cpu->v[op_info.x] -= cpu->v[op_info.y];
         break;
     case OP_SHR:
         cpu->v[0xF] = cpu->v[op_info.x] & 0x1;
         cpu->v[op_info.x] = cpu->v[op_info.x] >> 1;
         break;
     case OP_SUBN:
-        cpu->v[0xF] = cpu->v[op_info.y] > cpu->v[op_info.x] ? 1 : 0;
+        cpu->v[0xF] = cpu->v[op_info.y] >= cpu->v[op_info.x] ? 1 : 0;
         cpu->v[op_info.x] = cpu->v[op_info.y] - cpu->v[op_info.x];
         break;
     case OP_SHL:
-        cpu->v[0xF] = (cpu->v[op_info.x] & 0x8000) ? 1 : 0;
-        cpu->v[op_info.x] *= 2;
+        cpu->v[0xF] = cpu->v[op_info.x] >> 7 & 1;
+        cpu->v[op_info.x] = (cpu->v[op_info.x] << 1) & 0xFF;
         break;
     case OP_SNE_REG:
         if (cpu->v[op_info.x] != cpu->v[op_info.y]) {
@@ -294,7 +292,19 @@ void execute_cycle(uint8_t *memory, struct chip8_regset *cpu, uint16_t *stack, u
         cpu->i = get_sprite_address(cpu->v[op_info.x]);
         break;
     case OP_LD_BCD:
-        
+        memory[cpu->i] = cpu->v[op_info.x] / 100;
+        memory[cpu->i + 1] = (cpu->v[op_info.x] % 100) / 10;
+        memory[cpu->i + 2] = cpu->v[op_info.x] % 10;
+        break;
+    case OP_STORE_REGS:
+        for(int i = 0; i <= op_info.x; i++) {
+            memory[cpu->i + i] = cpu->v[i];
+        }
+        break;
+    case OP_LOAD_REGS:
+        for(int i = 0; i <= op_info.x; i++) {
+            cpu->v[i] = memory[cpu->i + i];
+        }
         break;
     default:
         break;
